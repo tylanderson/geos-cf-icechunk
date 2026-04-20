@@ -1,0 +1,10 @@
+[project]
+name = "query_thredds"
+version = "0.1.0"
+description = "Search a thredds catalog"
+readme = "README.md"
+requires-python = ">=3.11"
+
+dependencies = [
+    "siphon>=0.10.0",
+]
