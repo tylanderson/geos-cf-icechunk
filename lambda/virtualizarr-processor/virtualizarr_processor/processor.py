@@ -277,68 +277,45 @@ class Processor:
         _ = repo.expire_snapshots(older_than=expiry_time)
         return repo.garbage_collect(delete_object_older_than=expiry_time)
 
-    def latest_time(self) -> datetime | None:
-        """Return the latest datetime in the dataset's time coordinate, if available."""
-        try:
-            repo = icechunk.Repository.open(storage=self._get_storage())
-            session = repo.readonly_session(branch=ICECHUNK_BRANCH)
-            ds = xr.open_zarr(session.store)
-            try:
-                if "time" not in ds.coords:
-                    return None
-
-                time_values = ds["time"].values
-                if len(time_values) == 0:
-                    return None
-
-                latest = pd.Timestamp(time_values.max())
-                if pd.isna(latest):
-                    return None
-
-                if latest.tzinfo is None:
-                    latest = latest.tz_localize(UTC)
-                else:
-                    latest = latest.tz_convert(UTC)
-
-                latest_dt = latest.to_pydatetime()
-                if isinstance(latest_dt, datetime):
-                    return latest_dt
-                return None
-            finally:
-                ds.close()
-        except Exception:
-            return None
-
-    def stored_times(
+    def search_state(
         self,
         start_dt: datetime | None = None,
         end_dt: datetime | None = None,
-    ) -> set[datetime]:
-        """Return stored UTC datetimes from the dataset's time coordinate."""
+    ) -> tuple[datetime | None, set[datetime]]:
+        """Return latest time and stored times in a single repository read."""
         try:
             repo = icechunk.Repository.open(storage=self._get_storage())
             session = repo.readonly_session(branch=ICECHUNK_BRANCH)
             ds = xr.open_zarr(session.store)
             try:
                 if "time" not in ds.coords:
-                    return set()
+                    return None, set()
 
                 time_index = pd.DatetimeIndex(ds["time"].values)
                 if len(time_index) == 0:
-                    return set()
+                    return None, set()
 
                 if time_index.tz is None:
                     time_index = time_index.tz_localize(UTC)
                 else:
                     time_index = time_index.tz_convert(UTC)
 
-                if start_dt is not None:
-                    time_index = time_index[time_index >= pd.Timestamp(start_dt)]
-                if end_dt is not None:
-                    time_index = time_index[time_index <= pd.Timestamp(end_dt)]
+                # Latest time
+                latest_ts = time_index.max()
+                latest_dt: datetime | None = None
+                if not pd.isna(latest_ts):
+                    latest_dt = latest_ts.to_pydatetime()
 
-                return {timestamp.to_pydatetime() for timestamp in time_index}
+                # Stored times within range
+                filtered = time_index
+                if start_dt is not None:
+                    filtered = filtered[filtered >= pd.Timestamp(start_dt)]
+                if end_dt is not None:
+                    filtered = filtered[filtered <= pd.Timestamp(end_dt)]
+
+                stored = {ts.to_pydatetime() for ts in filtered}
+                return latest_dt, stored
             finally:
                 ds.close()
         except Exception:
-            return set()
+            return None, set()

@@ -82,8 +82,12 @@ def process_notification(message: Dict[str, Any]) -> None:
     Process a notification message.
 
     Args:
-        message: The notification message to process
+        message: The notification message to process.
+            Supports ``"overwrite": true`` to use region writes
+            instead of the default append.
     """
+    overwrite = bool(message.get("overwrite", False))
+
     # Extract file URL from the message
     file_url = message.get("url") or message.get("file_url") or message.get("http_url")
     file_urls = message.get("urls", [])
@@ -97,6 +101,7 @@ def process_notification(message: Dict[str, Any]) -> None:
                 "input_url": file_url,
                 "file_key": file_key,
                 "http_url": http_url,
+                "overwrite": overwrite,
             },
         )
         file_keys = [file_key]
@@ -108,6 +113,7 @@ def process_notification(message: Dict[str, Any]) -> None:
             extra={
                 "input_urls": file_urls,
                 "file_keys": file_keys,
+                "overwrite": overwrite,
             },
         )
         logger.info(f"{len(file_keys)} files successfully processed")
@@ -115,7 +121,7 @@ def process_notification(message: Dict[str, Any]) -> None:
         raise ValueError("No valid file URL found in message")
 
     logger.info(f"Processing {len(file_keys)} files")
-    _ = PROCESSOR.process_file(file_keys=file_keys)
+    _ = PROCESSOR.process_file(file_keys=file_keys, overwrite=overwrite)
 
 
 @logger.inject_lambda_context()

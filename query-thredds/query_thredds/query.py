@@ -34,6 +34,11 @@ def load_catalog(
             return TDSCatalog(url)
         except Exception as e:
             last_error = e
+            # Don't retry client errors (4xx) — they won't resolve with retries
+            err_str = str(e)
+            if "404" in err_str or "400" in err_str or "403" in err_str:
+                logger.error(f"Non-retryable error loading catalog: {e}")
+                raise
             if attempt < retries - 1:
                 wait = delay * (backoff**attempt)
                 logger.warning(
