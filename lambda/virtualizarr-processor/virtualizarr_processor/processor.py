@@ -168,6 +168,30 @@ class Processor:
             from_env=True,
         )
 
+    def _get_config(
+        self, split_config: icechunk.ManifestSplittingConfig | None = None
+    ) -> icechunk.RepositoryConfig:
+        cache_config = icechunk.CachingConfig(
+            num_snapshot_nodes=200,
+            num_chunk_refs=2_000_000,
+            num_transaction_changes=0,
+            num_bytes_attributes=0,
+            num_bytes_chunks=0,
+        )
+        manifest = (
+            icechunk.ManifestConfig(splitting=split_config) if split_config else None
+        )
+        kwargs: dict[str, Any] = {"caching": cache_config}
+        if manifest:
+            kwargs["manifest"] = manifest
+        config = icechunk.RepositoryConfig(**kwargs)
+        config.set_virtual_chunk_container(
+            icechunk.VirtualChunkContainer(
+                url_prefix=URL_PREFIX, store=icechunk.http_store()
+            )
+        )
+        return config
+
     def initialize_store(self) -> Repository:
         if not self.init_key:
             raise ValueError("Processor init_key must be provided to initialize_store")
@@ -188,23 +212,7 @@ class Processor:
                 }
             }
         )
-        cache_config = icechunk.CachingConfig(
-            num_snapshot_nodes=25,
-            num_chunk_refs=2_000_000,
-            num_transaction_changes=0,
-            num_bytes_attributes=0,
-            num_bytes_chunks=0,
-        )
-
-        config = icechunk.RepositoryConfig(
-            caching=cache_config,
-            manifest=icechunk.ManifestConfig(splitting=split_config),
-        )
-        config.set_virtual_chunk_container(
-            icechunk.VirtualChunkContainer(
-                url_prefix=URL_PREFIX, store=icechunk.http_store()
-            )
-        )
+        config = self._get_config(split_config=split_config)
         repo = icechunk.Repository.open_or_create(
             storage=storage,
             config=config,
@@ -284,7 +292,10 @@ class Processor:
     ) -> tuple[datetime | None, set[datetime]]:
         """Return latest time and stored times in a single repository read."""
         try:
-            repo = icechunk.Repository.open(storage=self._get_storage())
+            repo = icechunk.Repository.open(
+                storage=self._get_storage(),
+                config=self._get_config(),
+            )
             session = repo.readonly_session(branch=ICECHUNK_BRANCH)
             ds = xr.open_zarr(session.store)
             try:
