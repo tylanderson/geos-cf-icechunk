@@ -30,13 +30,10 @@ The current configuration is driven by `StackSettings` in `cdk/settings.py`.
 | `BATCH_MAX_VCPU` | No | `10` | Garbage Collection | Max vCPU for AWS Batch compute environment. |
 
 Current processing behavior:
-- `initialize` creates/scaffolds the repository using the current production bootstrap key and time range in `virtualizarr_processor.processor`:
-	- `PROD_INIT_KEY = GMAO/GEOS-CF/analysis-v2/Y2025/M08/D04/...20250804_0930z.nc4`
-	- `PROD_START_DT = 2025-08-04T09:30:00Z`
-	- `PROD_END_DT = 2026-04-09T20:30:00Z`
+- `initialize` creates/scaffolds the repository using the current production bootstrap key and time range
 - `process_file` appends by default (`append_dim="time"`) and supports overwrite mode with `{"overwrite": true}`.
 - accepted message payloads:
-	- single URL: `url` (also accepts `file_url` or `http_url`)
+	- single URL: `url`
 	- multiple URLs: `urls`
 - URLs can be full THREDDS HTTP URLs or relative file keys.
 
